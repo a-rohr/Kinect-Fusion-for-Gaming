@@ -10,4 +10,4 @@ The key goals for this project are to:
 3. Create a simple car rig that can drive around the reconstructed scene and award users for safe driving. 
 
 # Project Timeline
-![Alt text](/Proposals/Timeline.jpg?raw=true "Optional Title")
+![Alt text](/Proposals/TimeLine.jpg?raw=true "Optional Title")
