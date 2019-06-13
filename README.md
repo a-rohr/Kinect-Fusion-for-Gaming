@@ -9,5 +9,10 @@ The key goals for this project are to:
 2. Integrate 3D-reconstructed scenes into Unity.
 3. Create a simple car rig that can drive around the reconstructed scene and award users for safe driving. 
 
+# Project Pipeline
+For this project, we are implementing the following game engine integration pipeline that combines the KinectFusion pipeline with the a pre-fabricated driving model in Unity3D.
+![Alt text](/Proposals/Pipeline.jpg?raw=true "Game Engine Integration Pipeline")
+
 # Project Timeline
-![Alt text](/Proposals/TimeLine.jpg?raw=true "Optional Title")
+This project had a development timeline of 6 weeks broken down into weekly milestones as indiacted below. 
+![Alt text](/Proposals/TimeLine.jpg?raw=true "Project Timeline")
