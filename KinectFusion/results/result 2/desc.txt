@@ -1,0 +1,5 @@
+from (-2, -2, -2) to (2, 2, 2)
+256 voxels per dimension
+
+trunc_coeff = 0.025
+icp min dist = 0.025
