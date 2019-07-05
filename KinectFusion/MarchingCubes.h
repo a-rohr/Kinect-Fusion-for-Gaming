@@ -475,6 +475,7 @@ bool ProcessVolumeCell(Volume* vol, int x, int y, int z, double iso, SimpleMesh*
 		vhandle[1] = mesh->addVertex(v1);
 		vhandle[2] = mesh->addVertex(v2);
 
+		#pragma omp critical(addmeshface)
 		mesh->addFace(vhandle[0], vhandle[1], vhandle[2]);
 	}
 	

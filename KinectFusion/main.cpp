@@ -121,14 +121,12 @@ void writeDepthImgToFile(cv::Mat &img)
 
 void saveVolume(Volume &vol, std::string filenameOut)
 {
+	clock_t begin = clock();
 	SimpleMesh mesh;
-	//#pragma omp parallel for
+	#pragma omp parallel for
 	for (int x = 0; x < vol.getDimX() - 1; x++)
 	{
-		if (x % 16 == 0)
-		{
-			std::cerr << "Marching Cubes on slice " << x << " of " << vol.getDimX() << std::endl;
-		}
+		std::cerr << "Marching Cubes on slice " << x << " of " << vol.getDimX() << std::endl;
 
 		for (unsigned int y = 0; y < vol.getDimY() - 1; y++)
 		{
@@ -145,32 +143,33 @@ void saveVolume(Volume &vol, std::string filenameOut)
 		std::cout << "ERROR: unable to write output file!" << std::endl;
 	}
 
+	clock_t end = clock();
+	double elapsedSecs = double(end - begin) / 1000;
+	std::cout << "saveVolume finished in " << elapsedSecs << " seconds." << std::endl;
+
 }
 
 void saveVolume(Volume &vol, std::string filenameOut, Matrix4f currentCameraPose, Matrix3f intrinsics, unsigned int depthImgHeight, unsigned int depthImgWidth)
 {
+	clock_t begin = clock();
 	SimpleMesh mesh;
 
-	for (unsigned int x = 0; x < vol.getDimX() - 1; x++)
+	#pragma omp parallel for
+	for (int x = 0; x < vol.getDimX() - 1; x++)
 	{
-		if (x % 16 == 0)
-		{
-			std::cerr << "Marching Cubes on slice " << x << " of " << vol.getDimX() << std::endl;
-		}
+		std::cerr << "Marching Cubes on slice " << x << " of " << vol.getDimX() << std::endl;
 
 		for (unsigned int y = 0; y < vol.getDimY() - 1; y++)
 		{
 			for (unsigned int z = 0; z < vol.getDimZ() - 1; z++)
 			{
-				ProcessVolumeCell(&vol, x, y, z, 0.00f, &mesh);
+				ProcessVolumeCell(&vol, (unsigned int)x, y, z, 0.00f, &mesh);
 			}
 		}
 	}
 
 	SimpleMesh currentCameraMesh = SimpleMesh::camera(currentCameraPose, 0.0015f);
 	SimpleMesh resultingMesh = SimpleMesh::joinMeshes(mesh, currentCameraMesh, Matrix4f::Identity());
-
-
 
 
 
@@ -229,6 +228,9 @@ void saveVolume(Volume &vol, std::string filenameOut, Matrix4f currentCameraPose
 		std::cout << "ERROR: unable to write output file!" << std::endl;
 	}
 
+	clock_t end = clock();
+	double elapsedSecs = double(end - begin) / 1000;
+	std::cout << "saveVolume finished in " << elapsedSecs << " seconds." << std::endl;
 }
 
 
@@ -244,12 +246,9 @@ void localTSDF(Volume &vol, VirtualSensor &sensor, Matrix4f &cameraPose, float m
 	int depthImgWidth = sensor.getDepthImageWidth();
 
 	auto intrinsics = sensor.getDepthIntrinsics();
-	float truncation_coeff = 0.025;
+	float truncation_coeff = 0.025;	
 
-	Eigen::Vector3f cameraPoint;
-	Eigen::Vector3f pixPointHomo;
-
-	
+	#pragma omp parallel for
 	for (int x = 0; x < (int)vol.getDimX(); x++)
 	{
 		for (int y = 0; y < (int)vol.getDimY(); y++)
@@ -260,7 +259,7 @@ void localTSDF(Volume &vol, VirtualSensor &sensor, Matrix4f &cameraPose, float m
 				worldPointHomo << vol.pos(x, y, z).cast<float>(), 1;
 
 				//transform world point to cam coords
-				cameraPoint = (cameraPose * worldPointHomo).head(3);
+				Eigen::Vector3f cameraPoint = (cameraPose * worldPointHomo).head(3);
 
 				//point behind camera or too far away
 				if (cameraPoint.z() <= 0 || cameraPoint.z() > maxZ) {
@@ -268,7 +267,7 @@ void localTSDF(Volume &vol, VirtualSensor &sensor, Matrix4f &cameraPose, float m
 				}
 
 				//Project point to pixel in depthmap
-				pixPointHomo = intrinsics * cameraPoint;
+				Eigen::Vector3f pixPointHomo = intrinsics * cameraPoint;
 				Eigen::Vector2i pixPoint;
 				pixPoint << pixPointHomo.x() / pixPointHomo.z(), pixPointHomo.y() / pixPointHomo.z();
 
@@ -652,7 +651,7 @@ int executeKinect(float minx, float miny, float minz, float maxx, float maxy, fl
 
 	//writeDepthToFile(sensor);
 	std::string filenameOut = PROJECT_DIR + std::string("/results/result_global_0.off");
-	saveVolume(globalVolume, filenameOut, currentCameraPose, sensor.getDepthIntrinsics(), sensor.getDepthImageHeight(), sensor.getDepthImageWidth());
+	//saveVolume(globalVolume, filenameOut, currentCameraPose, sensor.getDepthIntrinsics(), sensor.getDepthImageHeight(), sensor.getDepthImageWidth());
 	//writeVolToFile(globalVolume, false);
 
 	//std::vector<Vector3f> raycastPts;
@@ -662,7 +661,7 @@ int executeKinect(float minx, float miny, float minz, float maxx, float maxy, fl
 
 
 	int i = 1;
-	const int iMax = 30;
+	const int iMax = 10;
 	while (sensor.processNextFrame() && i <= iMax) {
 		Raycaster raycaster(currentCameraPose, sensor.getDepthIntrinsics(), sensor.getDepthImageHeight(), sensor.getDepthImageWidth(), sensor.getColorRGBX());
 

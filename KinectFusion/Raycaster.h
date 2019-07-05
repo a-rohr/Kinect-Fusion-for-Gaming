@@ -231,7 +231,7 @@ public:
 		clock_t begin = clock();
 
 		//Eigen::Vector3f origin = _translation;
-		double stepSizeVoxel = .3;
+		double stepSizeVoxel = 1.5;
 
 		double epsilon = 1e-3;
 		Eigen::Vector3d origin = _translation.cast<double>();
@@ -241,11 +241,11 @@ public:
 
 
 
-		//#pragma omp parallel for  : size of hitPoints & hitNormals are not equal when enabled
+		#pragma omp parallel for  //: size of hitPoints & hitNormals are not equal when enabled
 		for (int y = 0; y < _depthImgHeight; y++)
 		{
-			if (y % 40 == 0)
-			std::cout << "Processing row #" << y << std::endl;
+			//if (y % 40 == 0)
+			//std::cout << "Processing row #" << y << std::endl;
 			for (int x = 0; x < _depthImgWidth; x++)
 			{
 				//double rayX = ((double)x - _cX) / _fovX;
@@ -295,8 +295,11 @@ public:
 					normal(2) = (float)normalVec.z();
 
 					//normalImage.at<cv::Vec3f>(y, x) = normal;
-					hitPoints.push_back(point.cast<float>());
-					hitNormals.push_back(normalVec);
+					#pragma omp critical(pushhit)
+					{
+						hitPoints.push_back(point.cast<float>());
+						hitNormals.push_back(normalVec);
+					}
 				}
 				else
 				{
