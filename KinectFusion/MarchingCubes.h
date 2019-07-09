@@ -471,12 +471,18 @@ bool ProcessVolumeCell(Volume* vol, int x, int y, int z, double iso, SimpleMesh*
 		v2.color = Vector4uc(255, 255, 255, 255);
 
 		unsigned int vhandle[3];
-		vhandle[0] = mesh->addVertex(v0);
-		vhandle[1] = mesh->addVertex(v1);
-		vhandle[2] = mesh->addVertex(v2);
+		
 
 		#pragma omp critical(addmeshface)
-		mesh->addFace(vhandle[0], vhandle[1], vhandle[2]);
+		{
+			
+			vhandle[0] = mesh->addVertex(v0);
+			vhandle[1] = mesh->addVertex(v1);
+			vhandle[2] = mesh->addVertex(v2);
+			mesh->addFace(vhandle[0], vhandle[1], vhandle[2]);
+
+		}
+		
 	}
 	
 

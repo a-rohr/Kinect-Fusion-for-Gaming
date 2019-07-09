@@ -91,8 +91,10 @@ public:
 		return &color[loc];
 	}
 
-	float getValueAtPoint(Eigen::Vector3d point)
+	float get_InterpVal(Eigen::Vector3d point)
 	{
+		//See https://www.wikiwand.com/en/Trilinear_interpolation
+		
 		// Clamp point to within the voxel volume
 
 		auto x_local = float((point.x() - lowerLeftPoint_g.x()) / totalLength.x())*numCellsX;
@@ -273,6 +275,10 @@ public:
 			&& point.z() < upperTopPoint_g.z();
 	}
 
+	inline double getNodeValAtWorld(Vector3d worldCoord)
+	{
+		return get(getNodeFromWorld(worldCoord.cast<float>()));
+	}
 
 	//! Lower left and Upper right corner.
 	Vector3d lowerLeftPoint_g, upperTopPoint_g;

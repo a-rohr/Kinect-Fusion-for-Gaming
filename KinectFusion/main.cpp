@@ -48,7 +48,7 @@ void writeVolToFile(Volume &vol, bool onlyPrint)
 						if (!onlyPrint)
 						{
 							outfile << x << " " << y << " " << z << " ";
-							outfile << vol.posX(x) << " " << vol.posY(y) << " " << vol.posZ(z) << " " << v << " " << vol.getValueAtPoint(vol.pos(x, y, z)) << std::endl;
+							outfile << vol.posX(x) << " " << vol.posY(y) << " " << vol.posZ(z) << " " << v << " " << vol.get_InterpVal(vol.pos(x, y, z)) << std::endl;
 						}
 
 
@@ -88,7 +88,7 @@ void writeVolToFile(Volume &vol, bool onlyPrint)
 	std::cout << "y min: " << minY << " max: " << maxY << std::endl;
 	std::cout << "z min: " << minZ << " max: " << maxZ << std::endl;
 }
-
+/*
 void writeDepthToFile(VirtualSensor &sensor)
 {
 	std::ofstream outfile;
@@ -118,7 +118,7 @@ void writeDepthImgToFile(cv::Mat &img)
 		outfile << std::endl;
 	}
 }
-
+*/
 void saveVolume(Volume &vol, std::string filenameOut)
 {
 	clock_t begin = clock();
@@ -246,7 +246,8 @@ void localTSDF(Volume &vol, VirtualSensor &sensor, Matrix4f &cameraPose, float m
 	int depthImgWidth = sensor.getDepthImageWidth();
 
 	auto intrinsics = sensor.getDepthIntrinsics();
-	float truncation_coeff = 0.025;	
+	float truncation_coeff = 0.06;
+	//float truncation_coeff = 0.025;	
 
 	#pragma omp parallel for
 	for (int x = 0; x < (int)vol.getDimX(); x++)
@@ -667,7 +668,8 @@ int executeKinect(float minx, float miny, float minz, float maxx, float maxy, fl
 
 		std::vector<Vector3f> raycastHitPoints;
 		std::vector<Vector3f> raycastHitNormals;
-		raycaster.castRays2(globalVolume, depthImage, normalMap, raycastHitPoints, raycastHitNormals);
+		//raycaster.castRays2(globalVolume, depthImage, normalMap, raycastHitPoints, raycastHitNormals);
+		raycaster.castRays3(globalVolume, depthImage, normalMap, raycastHitPoints, raycastHitNormals, 0.04);
 		std::cout << "Hit Points size: " << raycastHitPoints.size() << std::endl;
 		std::cout << "Hit Normals size: " << raycastHitNormals.size() << std::endl;
 
