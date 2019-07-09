@@ -16,109 +16,7 @@
 
 #include "Raycaster.h"
 
-void writeVolToFile(Volume &vol, bool onlyPrint)
-{
-	std::ofstream outfile;
-	if (!onlyPrint)
-		outfile.open("tsdf.txt");
-	int maxX = -999;
-	int maxY = -999;
-	int maxZ = -999;
-	int minX = 999;
-	int minY = 999;
-	int minZ = 999;
 
-
-	for (int z = 0; z < (int)vol.getDimZ(); z++)
-	{
-		for (int y = 0; y < (int)vol.getDimY(); y++)
-		{
-			for (int x = 0; x < (int)vol.getDimX(); x++)
-			{
-				double v = vol.get(x, y, z);
-				Vector3d pos = vol.pos(x, y, z);
-				if (v >= -0.1 && v <= 0.1)
-				{
-					//std::cout << "HOHOHO" << std::endl;
-					//if (vol.getValueAtPoint(pos) < 1)
-					//{
-						//uint posIdx = vol.getPosFromTuple(x, y, z);
-
-						v = round(v * 100) / 100;
-						if (!onlyPrint)
-						{
-							outfile << x << " " << y << " " << z << " ";
-							outfile << vol.posX(x) << " " << vol.posY(y) << " " << vol.posZ(z) << " " << v << " " << vol.get_InterpVal(vol.pos(x, y, z)) << std::endl;
-						}
-
-
-						if (x > maxX)
-							maxX = x;
-
-						if (y > maxY)
-							maxY = y;
-
-						if (z > maxZ)
-							maxZ = z;
-
-						if (x < minX)
-							minX = x;
-
-						if (y < minY)
-							minY = y;
-
-						if (z < minZ)
-							minZ = z;
-					//}
-
-				}
-				
-				/*outfile << v;
-				if (x + 1 != vol.getDimX())
-				{
-					outfile << " ";
-				}*/
-
-				
-			}
-		}
-	}
-
-	std::cout << "x min: " << minX << " max: " << maxX << std::endl;
-	std::cout << "y min: " << minY << " max: " << maxY << std::endl;
-	std::cout << "z min: " << minZ << " max: " << maxZ << std::endl;
-}
-/*
-void writeDepthToFile(VirtualSensor &sensor)
-{
-	std::ofstream outfile;
-	outfile.open("sensor_depth.txt");
-	for (int y = 0; y < (int)sensor.getDepthImageHeight(); y++)
-	{
-		for (int x = 0; x < (int)sensor.getDepthImageWidth(); x++)
-		{
-			outfile << sensor.getDepth()[y * (int)sensor.getDepthImageHeight() + x];
-			outfile << " ";
-		}
-		outfile << std::endl;
-	}
-}
-
-void writeDepthImgToFile(cv::Mat &img)
-{
-	std::ofstream outfile;
-	outfile.open("depth_img.txt");
-	for (int y = 0; y < img.rows; y++)
-	{
-		for (int x = 0; x < img.cols; x++)
-		{
-			outfile << img.at<float>(cv::Point(x, y));
-			outfile << " ";
-		}
-		outfile << std::endl;
-	}
-}
-*/
 void saveVolume(Volume &vol, std::string filenameOut)
 {
 	clock_t begin = clock();
@@ -126,7 +24,7 @@ void saveVolume(Volume &vol, std::string filenameOut)
 	#pragma omp parallel for
 	for (int x = 0; x < vol.getDimX() - 1; x++)
 	{
-		std::cerr << "Marching Cubes on slice " << x << " of " << vol.getDimX() << std::endl;
+		//std::cerr << "Marching Cubes on slice " << x << " of " << vol.getDimX() << std::endl;
 
 		for (unsigned int y = 0; y < vol.getDimY() - 1; y++)
 		{
@@ -157,7 +55,7 @@ void saveVolume(Volume &vol, std::string filenameOut, Matrix4f currentCameraPose
 	#pragma omp parallel for
 	for (int x = 0; x < vol.getDimX() - 1; x++)
 	{
-		std::cerr << "Marching Cubes on slice " << x << " of " << vol.getDimX() << std::endl;
+		//std::cerr << "Marching Cubes on slice " << x << " of " << vol.getDimX() << std::endl;
 
 		for (unsigned int y = 0; y < vol.getDimY() - 1; y++)
 		{
@@ -234,7 +132,6 @@ void saveVolume(Volume &vol, std::string filenameOut, Matrix4f currentCameraPose
 }
 
 
-
 void localTSDF(Volume &vol, VirtualSensor &sensor, Matrix4f &cameraPose, float maxZ)
 {
 	std::cout << "Executing TSDF" << std::endl;
@@ -246,7 +143,7 @@ void localTSDF(Volume &vol, VirtualSensor &sensor, Matrix4f &cameraPose, float m
 	int depthImgWidth = sensor.getDepthImageWidth();
 
 	auto intrinsics = sensor.getDepthIntrinsics();
-	float truncation_coeff = 0.06;
+	float truncation_coeff = 0.04;
 	//float truncation_coeff = 0.025;	
 
 	#pragma omp parallel for
@@ -339,102 +236,6 @@ void fuseFrames(Volume &global, Volume &current)
 	}
 }
 
-void processDepth(Volume &vol, PointCloud &points, PointCloud &nextPoints, VirtualSensor &sensor, Matrix4f &cameraPose, int i = -1)
-{
-	int depthImgHeight = sensor.getDepthImageHeight();
-	int depthImgWidth = sensor.getDepthImageWidth();
-	cv::Mat outputImg = cv::Mat::zeros(depthImgHeight, depthImgWidth, 0);
-
-	auto intrinsics = sensor.getDepthIntrinsics();
-
-	std::cout << "Executing TSDF" << std::endl;
-	clock_t begin = clock();
-
-	//localTSDF(vol, sensor, cameraPose);
-
-	/*float truncation_coeff = 0.1;
-
-	#pragma omp parallel for
-	for (int x = 0; x < (int)vol.getDimX(); x++)
-	{
-		for (int y = 0; y < (int)vol.getDimY(); y++)
-		{
-			for (int z = 0; z < (int)vol.getDimZ(); z++)
-			{
-
-				Vector3f v_g = vol.pos(x, y, z).cast<float>();
-
-				Vector3f v = cameraPose.block<3, 3>(0, 0) * v_g + cameraPose.block<3, 1>(0, 3);
-
-				Vector3f p_homo = intrinsics * v;
-				int pixel_u = (int)(p_homo.x() / p_homo.z());
-				int pixel_v = (int)(p_homo.y() / p_homo.z());
-
-				if (pixel_u > 0 && pixel_u < depthImgWidth && pixel_v > 0 && pixel_v < depthImgHeight && v_g.z() < 2.1  && v_g.z() > -0.1)
-				{
-					unsigned int depthIdx = pixel_v * depthImgWidth + pixel_u; // linearized index
-
-					float sdf;
-					float measuredDepth = sensor.getDepth()[depthIdx];
-					if (measuredDepth > 0 && measuredDepth < 10)
-					{
-						sdf = sensor.getDepth()[depthIdx] - (cameraPose.block<3, 1>(0, 3) - v_g).squaredNorm();
-					}
-					else
-					{
-						sdf = 100;
-					}
-
-					float tsdf;
-					if (sdf > 0)
-					{
-						tsdf = std::min(1.0f, sdf / truncation_coeff);
-					}
-					else
-					{
-						tsdf = std::max(-1.0f, sdf / truncation_coeff);
-					}
-
-					double w_prev = vol.getWeight(x, y, z);
-					double w = std::min(5.0, w_prev + 1);
-
-					double tsdf_prev = vol.get(x, y, z);
-					double tsdf_avg = (tsdf_prev * w_prev + tsdf * w) / (w_prev + w);
-
-					assert(tsdf_avg <= 1);
-					assert(tsdf_avg >= -1);
-
-					vol.set(x, y, z, tsdf_avg);
-					vol.setWeight(x, y, z, w);
-					//vol.setColor(x, y, z, sensor.getColorRGBX()[])
-				}
-				else
-				{
-					// Front of the object + zero weight
-					vol.set(x, y, z, 1);
-					vol.setWeight(x, y, z, 0);
-				}
-			}
-		}
-	}*/
-
-	//writeVolToFile(vol);
-	/*Eigen::AngleAxisd rollAngle(0, Eigen::Vector3d::UnitZ());
-	Eigen::AngleAxisd yawAngle(-3, Eigen::Vector3d::UnitY());
-	Eigen::AngleAxisd pitchAngle(0, Eigen::Vector3d::UnitX());
-
-	Eigen::Quaternion<double> q = rollAngle * yawAngle * pitchAngle;
-	Eigen::Matrix3d rotationMatrix = q.matrix();
-
-	Matrix4f viewCamPose;
-	viewCamPose << rotationMatrix(0, 0), rotationMatrix(0, 1), rotationMatrix(0, 2), -0.8,
-		rotationMatrix(1, 0), rotationMatrix(1, 1), rotationMatrix(1, 2), 0.5,
-		rotationMatrix(2, 0), rotationMatrix(2, 1), rotationMatrix(2, 2), 0,
-		0, 0, 0, 1;*/
-
-	Raycaster raycaster(cameraPose, intrinsics, depthImgHeight, depthImgWidth, sensor.getColorRGBX());
-	//raycaster.castRays(vol, true, i);
-}
 
 int buildSensor(VirtualSensor &sensor)
 {
@@ -449,150 +250,6 @@ int buildSensor(VirtualSensor &sensor)
 	return true;
 }
 
-void lala()
-{
-	unsigned int mc_res = 128;
-	Volume vol(Vector3d(0, 0, 0), Vector3d(0.5, 0.5, 0.5), mc_res, mc_res, mc_res);
-
-	//auto nearestQueryResults = nearestNeighborSearch->queryMatches(vol.getAllVoxelPos());
-
-	float truncation_coeff = 1;
-
-	#pragma omp parallel for
-	for (int x = 0; x < (int)vol.getDimX(); x++)
-	{
-		for (int y = 0; y < (int)vol.getDimY(); y++)
-		{
-			for (int z = 0; z < (int)vol.getDimZ(); z++)
-			{
-				if (80 <= z && z < 110) {
-					if (60 <= x && x < 70) {
-						if (60 <= y && y < 70) {
-							vol.set(x, y, z, -0.1);
-						}
-						else {
-							vol.set(x, y, z, 0.1);
-						}
-					}
-					else {
-						vol.set(x, y, z, 0.1);
-					}
-				}
-				else {
-					vol.set(x, y, z, 0.1);
-				}
-			}
-		}
-	}
-
-	Volume vol2(Vector3d(-2, -2, -2), Vector3d(2, 2, 2), mc_res, mc_res, mc_res);
-	#pragma omp parallel for
-	for (int x = 0; x < (int)vol2.getDimX(); x++)
-	{
-		for (int y = 0; y < (int)vol2.getDimY(); y++)
-		{
-			for (int z = 0; z < (int)vol2.getDimZ(); z++)
-			{
-				bool assigned = false;
-				if (50 <= z && z < 60) {
-					if (50 <= x && x < 80) {
-						if (60 <= y && y < 70) {
-							vol2.set(x, y, z, -0.1);
-							assigned = true;
-						}
-					}
-				}
-				else if (80 <= z && z < 110) {
-					if (60 <= x && x < 70) {
-						if (60 <= y && y < 70) {
-							vol2.set(x, y, z, -0.1);
-							assigned = true;
-						}
-					}
-				}
-				else {
-					
-				}
-				if (!assigned)
-				{
-					vol2.set(x, y, z, 0.1);
-				}
-			}
-		}
-	}
-
-	Matrix4f currCamPose;
-	currCamPose << 1, 0, 0, 0,
-		0, 1, 0, 0,
-		0, 0, 1, 0,
-		0, 0, 0, 1;
-
-	VirtualSensor sensor;
-	if (!buildSensor(sensor))
-	{
-		std::cout << "Failed!" << std::endl;
-	}
-
-	//localTSDF(vol, target, sensor, initCamPose);
-	//processDepth(volume, target, nextPoints, sensor, currCamPose);
-	//Raycaster raycasterFirst(initCamPose, sensor.getDepthIntrinsics(), sensor.getDepthImageHeight(), sensor.getDepthImageWidth(), sensor.getColorRGBX());
-	//raycasterFirst.castRays(globalVolume, true, 100);
-
-	std::string filenameOut = PROJECT_DIR + std::string("/results/result_first.off");
-	saveVolume(vol, filenameOut);
-
-	std::string filenameOut2 = PROJECT_DIR + std::string("/results/result_second.off");
-	saveVolume(vol2, filenameOut2);
-
-
-	fuseFrames(vol, vol2);
-	std::string filenameOut3 = PROJECT_DIR + std::string("/results/result_combined.off");
-	saveVolume(vol, filenameOut3);
-
-	//Raycaster raycaster(currCamPose, sensor.getDepthIntrinsics(), sensor.getDepthImageHeight(), sensor.getDepthImageWidth(), sensor.getColorRGBX());
-	//PointCloud nextPts;
-	//raycaster.castRays(vol, true);
-}
-
-void putBBrect(float minx, float miny, float minz, float maxx, float maxy, float maxz)
-{
-	std::string filenameOut = PROJECT_DIR + std::string("/results/bb_rect.off");
-
-	SimpleMesh mesh0(Vector3f(minx, miny, minz), Vector3f(maxx, miny, minz), 1000, 0.1, Vector4uc(255, 0, 0, 255));
-	SimpleMesh mesh1(Vector3f(minx, miny, minz), Vector3f(minx, maxy, minz), 1000, 0.1, Vector4uc(0, 255, 0, 255));
-	SimpleMesh mesh2(Vector3f(minx, miny, minz), Vector3f(minx, miny, maxz), 1000, 0.1, Vector4uc(0, 0, 255, 255));
-	//SimpleMesh mesh3(Vector3f(maxx, miny, minz), Vector3f(maxx, maxy, minz), 1000, 0.1);
-	
-	/*SimpleMesh mesh3(Vector3f(minx, maxy, minz), Vector3f(maxx, maxy, minz), 1000, 0.1);
-	SimpleMesh mesh5(Vector3f(maxx, miny, minz), Vector3f(maxx, miny, maxz), 1000, 0.1);
-	SimpleMesh mesh6(Vector3f(maxx, maxy, minz), Vector3f(maxx, maxy, maxz), 1000, 0.1);
-	SimpleMesh mesh7(Vector3f(maxx, miny, maxz), Vector3f(maxx, maxy, maxz), 1000, 0.1);
-	SimpleMesh mesh8(Vector3f(minx, maxy, minz), Vector3f(minx, maxy, maxz), 1000, 0.1);
-	SimpleMesh mesh9(Vector3f(minx, maxy, maxz), Vector3f(minx, miny, maxz), 1000, 0.1);
-	SimpleMesh mesh10(Vector3f(minx, miny, maxz), Vector3f(maxx, miny, maxz), 1000, 0.1);
-	SimpleMesh mesh11(Vector3f(minx, maxy, maxz), Vector3f(maxx, maxy, maxz), 1000, 0.1);*/
-
-
-	SimpleMesh joinedMesh = SimpleMesh::joinMeshes(mesh0, mesh1, Matrix4f::Identity());
-	SimpleMesh joinedMesh2 = SimpleMesh::joinMeshes(joinedMesh, mesh2, Matrix4f::Identity());
-	//SimpleMesh joinedMesh3 = SimpleMesh::joinMeshes(joinedMesh2, mesh3, Matrix4f::Identity());
-	/*joinedMesh = SimpleMesh::joinMeshes(joinedMesh, mesh4, Matrix4f::Identity());
-	joinedMesh = SimpleMesh::joinMeshes(joinedMesh, mesh5, Matrix4f::Identity());
-	joinedMesh = SimpleMesh::joinMeshes(joinedMesh, mesh6, Matrix4f::Identity());
-	joinedMesh = SimpleMesh::joinMeshes(joinedMesh, mesh7, Matrix4f::Identity());
-	joinedMesh = SimpleMesh::joinMeshes(joinedMesh, mesh8, Matrix4f::Identity());
-	joinedMesh = SimpleMesh::joinMeshes(joinedMesh, mesh9, Matrix4f::Identity());
-	joinedMesh = SimpleMesh::joinMeshes(joinedMesh, mesh10, Matrix4f::Identity());
-	joinedMesh = SimpleMesh::joinMeshes(joinedMesh, mesh11, Matrix4f::Identity());*/
-
-	//SimpleMesh mesh0(Vector3f(minx, miny, minz), Vector3f(maxx, maxy, maxz), 1000, 0.1);
-
-	// write mesh to file
-	if (!joinedMesh2.writeMesh(filenameOut))
-	{
-		std::cout << "ERROR: unable to write output file!" << std::endl;
-	}
-}
 
 int executeKinect(float minx, float miny, float minz, float maxx, float maxy, float maxz)
 {
@@ -620,43 +277,22 @@ int executeKinect(float minx, float miny, float minz, float maxx, float maxy, fl
 
 
 	Matrix4f currentCameraPose;// = Matrix4f::Identity();
-	/*currentCameraPose << 1, 0, 0, 0,
-		0, -1, 0, 0,
-		0, 0, -1, 0,
-		0, 0, 0, 1;*/
-
+	
 	// 1.3434 0.6271 1.6606
 	//currentCameraPose(0, 3) = 1.5;
 	//currentCameraPose(1, 3) = 1.5;
 	//currentCameraPose(2, 3) = 1.5;
 	currentCameraPose = sensor.getTrajectory();
-	Matrix4f currentCameraToWorld = currentCameraPose.inverse(); //Matrix4f::Identity();
+	Matrix4f currentCameraToWorld = currentCameraPose.inverse(); 
 	std::cout << "Initial camera pose: " << std::endl << currentCameraPose << std::endl;
-
-
-	//Matrix4f currentCameraPose = Matrix4f::Identity();
-	//currentCameraPose(0, 3) = 2;
-	//currentCameraPose(1, 3) = 2;
-	//currentCameraPose(2, 3) = 2;
-	//Matrix4f currentCameraToWorld = currentCameraPose.inverse();
-
-	/*int x = 35;
-	int y = 51;
-	int z = 80;
-
-	Vector3d point_g = globalVolume.pos(35, 51, 80);
-	float val = globalVolume.getValueAtPoint(point_g);*/
-
 
 	localTSDF(globalVolume, sensor, currentCameraPose, worldEnd.z());
 
-	//writeDepthToFile(sensor);
+	
 	std::string filenameOut = PROJECT_DIR + std::string("/results/result_global_0.off");
 	//saveVolume(globalVolume, filenameOut, currentCameraPose, sensor.getDepthIntrinsics(), sensor.getDepthImageHeight(), sensor.getDepthImageWidth());
-	//writeVolToFile(globalVolume, false);
 
-	//std::vector<Vector3f> raycastPts;
-
+	
 	cv::Mat depthImage = cv::Mat::zeros(sensor.getDepthImageHeight(), sensor.getDepthImageWidth(), CV_32F);
 	cv::Mat normalMap = cv::Mat::zeros(sensor.getDepthImageHeight(), sensor.getDepthImageWidth(), CV_32FC3);
 
@@ -707,42 +343,15 @@ int executeKinect(float minx, float miny, float minz, float maxx, float maxy, fl
 
 }
 
-void testMeshLine()
-{
-	std::string filenameOut = PROJECT_DIR + std::string("/results/line_test.off");
-	SimpleMesh mesh (Vector3f(0, 0, 0), Vector3f(1, 1, 1), 100, 0.1);
-
-	SimpleMesh currentCameraMesh = SimpleMesh::camera(Matrix4f::Identity(), 0.0015f);
-	SimpleMesh resultingMesh = SimpleMesh::joinMeshes(mesh, currentCameraMesh, Matrix4f::Identity());
-
-	// write mesh to file
-	if (!resultingMesh.writeMesh(filenameOut))
-	{
-		std::cout << "ERROR: unable to write output file!" << std::endl;
-	}
-}
 
 int main()
 {
-	//lala();
-	//testMeshLine();
-
-	//float camX, camY, camZ;
+	
 	float minx, miny, minz;
 	float maxx, maxy, maxz;
 	while (false)
 	{
-		/*std::cout << "Cam X: ";
-		std::cin >> camX;
-
-		std::cout << "Cam Y: ";
-		std::cin >> camY;
-
-		std::cout << "Cam Z: ";
-		std::cin >> camZ;*/
-
-
-
+		
 		std::cout << "Min X: ";
 		std::cin >> minx;
 
@@ -751,7 +360,6 @@ int main()
 
 		std::cout << "Min Z: ";
 		std::cin >> minz;
-
 
 
 		std::cout << "Max X: ";
@@ -763,12 +371,9 @@ int main()
 		std::cout << "Max Z: ";
 		std::cin >> maxz;
 
-
-
 		executeKinect(minx, miny, minz, maxx, maxy, maxz);
 	}
-	//executeKinect(-1, -1.5, 0, 1, 0.5, 2);
-	//putBBrect(-1, -1.5, 0, 1, 0.5, 2);
+	
 	executeKinect(-2, -2, -2, 2, 2, 2);
 	
 	
