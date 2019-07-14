@@ -133,6 +133,61 @@ void saveVolume(Volume &vol, std::string filenameOut, Matrix4f currentCameraPose
 	std::cout << "saveVolume finished in " << elapsedSecs << " seconds." << std::endl;
 }
 
+void depthFilterK3(cv::Mat& inputDepth, cv::Mat& outputDepth)
+{
+	float threshold = 0.021;
+	//Zero padding
+	cv::Mat inputPadded;
+	cv::copyMakeBorder(inputDepth, inputPadded, 1, 1, 1, 1, CV_HAL_BORDER_CONSTANT, 0);
+	//float sigma_l_pix = 0.8 + 0.035*(M_PI / 6) / ((M_PI / 2) - (M_PI / 6));
+	float sigma_l_pix = 0.8 + 0.035*0.5;
+	int no_changes = 0;
+
+#pragma omp parallel for
+	for (int u = 0; u < outputDepth.cols; u++)
+	{
+		for (int v = 0; v < outputDepth.rows; v++)
+		{
+			float numerator = 0;
+			float weights = 0;
+			float D_i = inputPadded.at<float>(v + 1, u + 1);
+			if ((D_i < 3) && (D_i > 0.4))
+			{
+				float sigma_l = sigma_l_pix * D_i*3.501e-3f;
+				float sigma_z = 0.0012f + 0.0019*pow((D_i - 0.4), 2) + (0.0001 / sqrt(D_i))*0.25;
+				for (int r = 0; r <= 2; r++)
+				{
+					for (int c = 0; c <= 2; c++)
+					{
+						float D_n = inputPadded.at<float>(v + r, u + c);
+						float delta_z = std::abs(D_i - D_n);
+						if ((delta_z < threshold) && (D_n > 0))
+						{
+							float delta_u = sqrt(pow(r - 1, 2) + pow(c - 1, 2));
+							float weight = exp(-(pow(delta_u, 2) / (2 * pow(sigma_l, 2)))
+								- (pow(delta_z, 2) / (2 * pow(sigma_z, 2))));
+							numerator += weight * D_n;
+							weights += weight;
+						}
+
+					}
+				}
+				if (weights > 0)
+				{
+					outputDepth.at<float>(v, u) = numerator / weights;
+				}
+				else
+				{
+					no_changes++;
+				}
+			}
+		}
+	}
+	std::cout << "The # of no changes in the filtering was: " << no_changes << std::endl;
+
+
+}
+
 void depthFilter(cv::Mat& inputDepth, cv::Mat& outputDepth)
 {
 	float threshold = 0.021;
@@ -205,7 +260,7 @@ void localTSDF3(Volume &vol, VirtualSensor &sensor, Matrix4f &cameraPose, float 
 	cv::Mat inputDepth(sensor.getDepthImageHeight(), sensor.getDepthImageWidth(), CV_32F, sensor.getDepth());
 	cv::Mat dst=inputDepth.clone();
 	//cv::bilateralFilter(src, dst, -1, 5, 5);
-	depthFilter(inputDepth, dst);
+	depthFilterK3(inputDepth, dst);
 
 #pragma omp parallel for
 	for (int x = 0; x < (int)vol.getDimX(); x++)
