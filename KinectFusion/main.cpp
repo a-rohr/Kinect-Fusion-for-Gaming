@@ -13,6 +13,8 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include "MarchingCubes.h"
+#include "opencv2/imgproc/imgproc.hpp"
+#include "opencv2/highgui/highgui.hpp"
 
 #include "Raycaster.h"
 
@@ -131,6 +133,134 @@ void saveVolume(Volume &vol, std::string filenameOut, Matrix4f currentCameraPose
 	std::cout << "saveVolume finished in " << elapsedSecs << " seconds." << std::endl;
 }
 
+void depthFilter(cv::Mat& inputDepth, cv::Mat& outputDepth)
+{
+	float threshold = 0.021;
+	//Zero padding
+	cv::Mat inputPadded;
+	cv::copyMakeBorder(inputDepth, inputPadded, 2, 2, 2, 2, CV_HAL_BORDER_CONSTANT, 0);
+	//float sigma_l_pix = 0.8 + 0.035*(M_PI / 6) / ((M_PI / 2) - (M_PI / 6));
+	float sigma_l_pix = 0.8 + 0.035*0.5;
+	int no_changes = 0;
+
+#pragma omp parallel for
+	for (int u = 0; u < outputDepth.cols; u++)
+	{
+		for (int v = 0; v < outputDepth.rows; v++)
+		{
+			float numerator = 0;
+			float weights = 0;
+			float D_i = inputPadded.at<float>(v + 2, u + 2);
+			if ((D_i < 3) && (D_i > 0.4))
+			{
+				float sigma_l = sigma_l_pix * D_i*3.501e-3f;
+				float sigma_z = 0.0012f + 0.0019*pow((D_i - 0.4), 2) + (0.0001 / sqrt(D_i))*0.25;
+				for (int r = 0; r <= 4; r++)
+				{
+					for (int c = 0; c <= 4; c++)
+					{
+						float D_n = inputPadded.at<float>(v + r, u + c);
+						float delta_z = std::abs(D_i - D_n);
+						if ((delta_z < threshold) && (D_n > 0))
+						{
+							float delta_u = sqrt(pow(r - 2, 2) + pow(c - 2, 2));
+							float weight = exp(-(pow(delta_u, 2) / (2 * pow(sigma_l, 2)))
+								- (pow(delta_z, 2) / (2 * pow(sigma_z, 2))));
+							numerator += weight * D_n;
+							weights += weight;
+						}
+						
+					}
+				}
+				if (weights > 0)
+				{
+					outputDepth.at<float>(v, u) = numerator / weights;
+				}
+				else
+				{
+					no_changes++;
+				}
+			}
+		}
+	}
+	std::cout << "The # of no changes in the filtering was: " << no_changes << std::endl;
+
+
+}
+
+void localTSDF3(Volume &vol, VirtualSensor &sensor, Matrix4f &cameraPose, float maxZ)
+{
+	std::cout << "Executing TSDF" << std::endl;
+	clock_t begin = clock();
+
+	vol.clean();
+
+	int depthImgHeight = sensor.getDepthImageHeight();
+	int depthImgWidth = sensor.getDepthImageWidth();
+
+	auto intrinsics = sensor.getDepthIntrinsics();
+	float truncation_coeff = 0.04;
+	//float truncation_coeff = 0.025;	
+
+	cv::Mat inputDepth(sensor.getDepthImageHeight(), sensor.getDepthImageWidth(), CV_32F, sensor.getDepth());
+	cv::Mat dst=inputDepth.clone();
+	//cv::bilateralFilter(src, dst, -1, 5, 5);
+	depthFilter(inputDepth, dst);
+
+#pragma omp parallel for
+	for (int x = 0; x < (int)vol.getDimX(); x++)
+	{
+		for (int y = 0; y < (int)vol.getDimY(); y++)
+		{
+			for (int z = 0; z < (int)vol.getDimZ(); z++)
+			{
+				Eigen::Vector4f worldPointHomo;
+				worldPointHomo << vol.pos(x, y, z).cast<float>(), 1;
+
+				//transform world point to cam coords
+				Eigen::Vector3f cameraPoint = (cameraPose * worldPointHomo).head(3);
+
+				//point behind camera or too far away
+				if (cameraPoint.z() <= 0 || cameraPoint.z() > maxZ) {
+					continue;
+				}
+
+				//Project point to pixel in depthmap
+				Eigen::Vector3f pixPointHomo = intrinsics * cameraPoint;
+				Eigen::Vector2i pixPoint;
+				pixPoint << pixPointHomo.x() / pixPointHomo.z(), pixPointHomo.y() / pixPointHomo.z();
+
+				if (pixPoint[0] < 0 || pixPoint[0] >= depthImgWidth || pixPoint[1] < 0 || pixPoint[1] >= depthImgHeight)
+				{
+					continue;
+				}
+
+				int depthRow = pixPoint.y();//_camResolution.y()-1 - pixPoint.y(); //row0 is at top. y0 is at bottom.
+				int depthCol = pixPoint.x();
+				double pointDepth = cameraPoint.z();
+				unsigned int depthIdx = pixPoint[1] * depthImgWidth + pixPoint[0]; // linearized index
+				//float TSDF_val = (float)sensor.getDepth()[depthIdx] - (float)pointDepth;
+				float TSDF_val = dst.at<float>(depthRow, depthCol) - (float)pointDepth;
+
+				//truncate SDF value
+				if (TSDF_val >= -truncation_coeff) {
+					TSDF_val = std::min(1.0f, fabsf(TSDF_val) / truncation_coeff)*copysignf(1.0f, TSDF_val);
+				}
+				else { //too far behind obstacle
+					continue;
+				}
+
+				vol.set(x, y, z, TSDF_val);
+				vol.setWeight(x, y, z, 1.0);
+			}
+		}
+	}
+
+	clock_t end = clock();
+	double elapsedSecs = double(end - begin) / 1000;
+	std::cout << "TSDF finished in " << elapsedSecs << " seconds." << std::endl;
+}
+
 
 void localTSDF(Volume &vol, VirtualSensor &sensor, Matrix4f &cameraPose, float maxZ)
 {
@@ -199,6 +329,77 @@ void localTSDF(Volume &vol, VirtualSensor &sensor, Matrix4f &cameraPose, float m
 	std::cout << "TSDF finished in " << elapsedSecs << " seconds." << std::endl;
 }
 
+void localTSDF2(Volume &vol, VirtualSensor &sensor, Matrix4f &cameraPose, float maxZ)
+{
+	std::cout << "Executing TSDF" << std::endl;
+	clock_t begin = clock();
+
+	vol.clean();
+
+	int depthImgHeight = sensor.getDepthImageHeight();
+	int depthImgWidth = sensor.getDepthImageWidth();
+
+	auto intrinsics = sensor.getDepthIntrinsics();
+	float truncation_coeff = 0.04;
+	//float truncation_coeff = 0.025;	
+
+	cv::Mat src(sensor.getDepthImageHeight(), sensor.getDepthImageWidth(), CV_32F, sensor.getDepth());
+	cv::Mat dst;
+	cv::bilateralFilter(src, dst, -1, 0.07, 5);
+
+#pragma omp parallel for
+	for (int x = 0; x < (int)vol.getDimX(); x++)
+	{
+		for (int y = 0; y < (int)vol.getDimY(); y++)
+		{
+			for (int z = 0; z < (int)vol.getDimZ(); z++)
+			{
+				Eigen::Vector4f worldPointHomo;
+				worldPointHomo << vol.pos(x, y, z).cast<float>(), 1;
+
+				//transform world point to cam coords
+				Eigen::Vector3f cameraPoint = (cameraPose * worldPointHomo).head(3);
+
+				//point behind camera or too far away
+				if (cameraPoint.z() <= 0 || cameraPoint.z() > maxZ) {
+					continue;
+				}
+
+				//Project point to pixel in depthmap
+				Eigen::Vector3f pixPointHomo = intrinsics * cameraPoint;
+				Eigen::Vector2i pixPoint;
+				pixPoint << pixPointHomo.x() / pixPointHomo.z(), pixPointHomo.y() / pixPointHomo.z();
+
+				if (pixPoint[0] < 0 || pixPoint[0] >= depthImgWidth || pixPoint[1] < 0 || pixPoint[1] >= depthImgHeight)
+				{
+					continue;
+				}
+
+				int depthRow = pixPoint.y();//_camResolution.y()-1 - pixPoint.y(); //row0 is at top. y0 is at bottom.
+				int depthCol = pixPoint.x();
+				double pointDepth = cameraPoint.z();
+				unsigned int depthIdx = pixPoint[1] * depthImgWidth + pixPoint[0]; // linearized index
+				//float TSDF_val = (float)sensor.getDepth()[depthIdx] - (float)pointDepth;
+				float TSDF_val = dst.at<float>(depthRow,depthCol) - (float)pointDepth;
+
+				//truncate SDF value
+				if (TSDF_val >= -truncation_coeff) {
+					TSDF_val = std::min(1.0f, fabsf(TSDF_val) / truncation_coeff)*copysignf(1.0f, TSDF_val);
+				}
+				else { //too far behind obstacle
+					continue;
+				}
+
+				vol.set(x, y, z, TSDF_val);
+				vol.setWeight(x, y, z, 1.0);
+			}
+		}
+	}
+
+	clock_t end = clock();
+	double elapsedSecs = double(end - begin) / 1000;
+	std::cout << "TSDF finished in " << elapsedSecs << " seconds." << std::endl;
+}
 
 void fuseFrames(Volume &global, Volume &current)
 {
@@ -286,7 +487,7 @@ int executeKinect(float minx, float miny, float minz, float maxx, float maxy, fl
 	Matrix4f currentCameraToWorld = currentCameraPose.inverse(); 
 	std::cout << "Initial camera pose: " << std::endl << currentCameraPose << std::endl;
 
-	localTSDF(globalVolume, sensor, currentCameraPose, worldEnd.z());
+	localTSDF3(globalVolume, sensor, currentCameraPose, worldEnd.z());
 
 	
 	std::string filenameOut = PROJECT_DIR + std::string("/results/result_global_0.off");
@@ -302,12 +503,16 @@ int executeKinect(float minx, float miny, float minz, float maxx, float maxy, fl
 	while (sensor.processNextFrame() && i <= iMax) {
 		Raycaster raycaster(currentCameraPose, sensor.getDepthIntrinsics(), sensor.getDepthImageHeight(), sensor.getDepthImageWidth(), sensor.getColorRGBX());
 
+		cv::Mat outputImg = cv::Mat::zeros(sensor.getDepthImageHeight(), sensor.getDepthImageWidth(), CV_8UC3);
+
 		std::vector<Vector3f> raycastHitPoints;
 		std::vector<Vector3f> raycastHitNormals;
 		//raycaster.castRays2(globalVolume, depthImage, normalMap, raycastHitPoints, raycastHitNormals);
-		raycaster.castRays3(globalVolume, depthImage, normalMap, raycastHitPoints, raycastHitNormals, 0.04);
+		raycaster.castRays3(globalVolume, depthImage, normalMap, raycastHitPoints, raycastHitNormals, outputImg,0.04);
 		std::cout << "Hit Points size: " << raycastHitPoints.size() << std::endl;
 		std::cout << "Hit Normals size: " << raycastHitNormals.size() << std::endl;
+
+		cv::imwrite(PROJECT_DIR + std::string("/results/raytracing_" + std::to_string(i) + ".png"), outputImg);
 
 		target.m_points = raycastHitPoints;
 		target.m_normals = raycastHitNormals;
@@ -323,10 +528,11 @@ int executeKinect(float minx, float miny, float minz, float maxx, float maxy, fl
 		currentCameraPose = currentCameraToWorld.inverse();
 		std::cout << "Current camera pose: " << std::endl << currentCameraPose << std::endl;
 
-		localTSDF(localVolume, sensor, currentCameraPose, worldEnd.z());
+		localTSDF3(localVolume, sensor, currentCameraPose, worldEnd.z());
 		fuseFrames(globalVolume, localVolume);
 
 		
+
 		if (i % 10 == 0)
 		{
 			filenameOut = PROJECT_DIR + std::string("/results/result_local_" + std::to_string(i) + ".off");

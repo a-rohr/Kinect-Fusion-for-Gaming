@@ -46,7 +46,7 @@ public:
 
 		//While in absolute free space
 
-		while (current_Val > 0.99f) //(ideally ==1.0f)
+		while (current_Val > 0.98f) //(ideally ==1.0f)
 		{
 			prev_Val = current_Val;
 			prev_Length = length;
@@ -86,7 +86,8 @@ public:
 						prev_Val = zeroValue;
 					}
 
-				} while ((prev_Length - length) > sizeVoxel); //Small distance to get good interpolation
+				} while (std::abs(zeroValue) > (1e-3));
+				//((length - prev_Length) > sizeVoxel); //Small distance to get good interpolation
 
 				//FINALLY: WE GOT THE RIGHT INTERSECTION. Now lets change "vertex" and "normal"
 
@@ -125,9 +126,9 @@ public:
 	}
 
 	void castRays3(Volume &vol, cv::Mat& depthImage, cv::Mat& normalImage, std::vector<Vector3f> &hitPoints,
-		std::vector<Vector3f> &hitNormals, float miu)
+		std::vector<Vector3f> &hitNormals, cv::Mat& outputImg, float miu)
 	{
-
+		//cv::Mat outputImg = cv::Mat::zeros(_depthImgHeight, _depthImgWidth, CV_8UC3);
 		miu = 0.04;
 		std::cout << "Executing Raycasting" << std::endl;
 		clock_t begin = clock();
@@ -178,6 +179,20 @@ public:
 						hitPoints.push_back(point.cast<float>());
 						hitNormals.push_back(normalVec);
 					}
+					
+					uchar intensity = (uchar)std::max(0.0f, normalVec.dot(rayDir.cast<float>()*-1)*255);
+					///*
+					outputImg.at<cv::Vec3b>(cv::Point(x, y)) = cv::Vec3b(
+						intensity,
+						intensity,
+						intensity);
+					//*/
+					/*
+					outputImg.at<cv::Vec3b>(y,x) = cv::Vec3b(
+						255,
+						255,
+						255);
+					*/
 				}
 				else
 				{
@@ -189,6 +204,8 @@ public:
 				}
 			}
 		}
+
+
 
 		clock_t end = clock();
 		double elapsedSecs = double(end - begin) / 1000;
