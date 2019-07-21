@@ -1,0 +1,25 @@
+Here are the important details concerning the game.
+This is only a test platform and so has limited features regarding resolution, key binding etc.
+
+There are three dropdown menus at the start of the game:
+1. First menu lets you pick the car.
+2. Second menu lets you pick one of the predefined game scenes.
+3. Third menu lets you pick a scene that is self recored and found in the folder "Streaming Assets". Only OBJ scenes are found and handled by the importer.
+
+Following controls:
+In driving mode:
+W,A,S,D - control the car and turn.
+Q - shifting up in the gearbox.
+E - shifting down in the gearbox.
+Ctrl - braking with the car.
+Shift - enter or leave flying mode.
+
+In flying mode:
+W,A,S,D - control the car and turn.
+Ctrl - increase the hover height.
+Alt - decrease the hover height.
+Space - enter precision mode (increments hover steps by 1).
+
+Esc - opens up the menu.
+
+NOTE: using the third menu makes use of the OBJ-Importer. This function can take a while to import the scenes (5 minutes wait times are normal). 
