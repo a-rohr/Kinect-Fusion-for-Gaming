@@ -16,3 +16,11 @@ For this project, we are implementing the following game engine integration pipe
 # Project Timeline
 This project had a development timeline of 6 weeks broken down into weekly milestones as indiacted below. 
 ![Alt text](/Proposals/TimeLine.jpg?raw=true "Project Timeline")
+
+# Final Project Pipeline
+This is the final pipeline of the rapid scene integration pipeline with the scample scenes and scan setup.
+![Alt text](/Proposals/FULL_PIPELINE_SETUP.png?raw=true "Rapid Scene Integration Pipeline")
+
+# Scanning Results
+Here is an overview of our scanning results and the scenes implemented in the game environment.
+![Alt text](/Proposals/Overview_Scanned_Scenes.png?raw=true "Scanned Sample Scenes")
