@@ -1,6 +1,8 @@
 Here are the important details concerning the game.
 This is only a test platform and so has limited features regarding resolution, key binding etc.
 
+The full Unity files are found in the Car_Driver_3DS zip, whilst the standalone game is in the Build_Game zip.
+
 There are three dropdown menus at the start of the game:
 1. First menu lets you pick the car.
 2. Second menu lets you pick one of the predefined game scenes.
