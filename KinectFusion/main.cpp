@@ -52,7 +52,10 @@ void saveVolume(TsdfUtils::TsdfData tsdfData, std::string filenameOut, Matrix4f 
 	SimpleMesh resultingMesh = SimpleMesh::joinMeshes(mesh, currentCameraMesh, Matrix4f::Identity());
 
 	// write mesh to file
-	if (!resultingMesh.writeMeshObj(filenameOut))
+	// WARNING: If you save mesh in OBJ format, you need to open it in Blender and re-export. 
+	// Otherwise problems will arise in Unity side
+	// WARNING 2: Meshes in OFF format are not supported by Unity!
+	if (!resultingMesh.writeMeshObj(filenameOut))   // alternatively: resultingMesh.writeMesh(filenameOut) for OFF file
 	{
 		std::cout << "ERROR: unable to write output file!" << std::endl;
 	}
