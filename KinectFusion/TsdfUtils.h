@@ -18,7 +18,7 @@ namespace TsdfUtils
 
 
 
-	inline Eigen::Vector3d pos(int i, int j, int k, unsigned int tsdfResolution, double tsdfSize)
+	inline Eigen::Vector3d tsdfIdxToWorldCoord(int i, int j, int k, unsigned int tsdfResolution, double tsdfSize)
 	{
 		Eigen::Vector3d coord(0, 0, 0);
 
@@ -57,7 +57,7 @@ namespace TsdfUtils
 		tsdf[x + y * tsdfResolution + z * tsdfResolution*tsdfResolution] = value;
 	}
 
-	inline bool tsdfWithinGrid(Eigen::Vector3d point, double tsdfSize)
+	inline bool isInTsdfGrid(Eigen::Vector3d point, double tsdfSize)
 	{
 		double x = point.x();
 		double y = point.y();
@@ -135,7 +135,7 @@ namespace TsdfUtils
 	}
 
 
-	inline bool projectRayToVoxelPoint(
+	inline bool projectToTsdf(
 		Eigen::Vector3d origin, Eigen::Vector3d direction, double& length,
 		double volumeSize)
 	{
@@ -175,8 +175,16 @@ namespace TsdfUtils
 		return true;
 	}
 
+	inline float getTsdfValueFromWorldCoord(Eigen::Vector3d point, TsdfData tsdfData)
+	{
+		auto xi = float(point.x() / tsdfData.size)*tsdfData.resolution;
+		auto yi = float(point.y() / tsdfData.size)*tsdfData.resolution;
+		auto zi = float(point.z() / tsdfData.size)*tsdfData.resolution;
 
-	inline float getValueAtPoint(Eigen::Vector3d point, TsdfData tsdfData)
+		return  TsdfUtils::getTsdfValue(zi, yi, zi, tsdfData);
+	}
+
+	inline float getInterpolatedTsdfValue(Eigen::Vector3d point, TsdfData tsdfData)
 	{
 		// Clamp point to within the voxel volume
 

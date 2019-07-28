@@ -426,21 +426,21 @@ bool ProcessVolumeCell(TsdfUtils::TsdfData tsdfData, int x, int y, int z, double
 	double tsdfSize = tsdfData.size;
 
 	// cell corners
-	tmp = TsdfUtils::pos(x + 1, y, z, tsdfResolution, tsdfSize);
+	tmp = TsdfUtils::tsdfIdxToWorldCoord(x + 1, y, z, tsdfResolution, tsdfSize);
 	cell.p[0] = Vector3d(tmp[0], tmp[1], tmp[2]);
-	tmp = TsdfUtils::pos(x, y, z, tsdfResolution, tsdfSize);
+	tmp = TsdfUtils::tsdfIdxToWorldCoord(x, y, z, tsdfResolution, tsdfSize);
 	cell.p[1] = Vector3d(tmp[0], tmp[1], tmp[2]);
-	tmp = TsdfUtils::pos(x, y + 1, z, tsdfResolution, tsdfSize);
+	tmp = TsdfUtils::tsdfIdxToWorldCoord(x, y + 1, z, tsdfResolution, tsdfSize);
 	cell.p[2] = Vector3d(tmp[0], tmp[1], tmp[2]);
-	tmp = TsdfUtils::pos(x + 1, y + 1, z, tsdfResolution, tsdfSize);
+	tmp = TsdfUtils::tsdfIdxToWorldCoord(x + 1, y + 1, z, tsdfResolution, tsdfSize);
 	cell.p[3] = Vector3d(tmp[0], tmp[1], tmp[2]);
-	tmp = TsdfUtils::pos(x + 1, y, z + 1, tsdfResolution, tsdfSize);
+	tmp = TsdfUtils::tsdfIdxToWorldCoord(x + 1, y, z + 1, tsdfResolution, tsdfSize);
 	cell.p[4] = Vector3d(tmp[0], tmp[1], tmp[2]);
-	tmp = TsdfUtils::pos(x, y, z + 1, tsdfResolution, tsdfSize);
+	tmp = TsdfUtils::tsdfIdxToWorldCoord(x, y, z + 1, tsdfResolution, tsdfSize);
 	cell.p[5] = Vector3d(tmp[0], tmp[1], tmp[2]);
-	tmp = TsdfUtils::pos(x, y + 1, z + 1, tsdfResolution, tsdfSize);
+	tmp = TsdfUtils::tsdfIdxToWorldCoord(x, y + 1, z + 1, tsdfResolution, tsdfSize);
 	cell.p[6] = Vector3d(tmp[0], tmp[1], tmp[2]);
-	tmp = TsdfUtils::pos(x + 1, y + 1, z + 1, tsdfResolution, tsdfSize);
+	tmp = TsdfUtils::tsdfIdxToWorldCoord(x + 1, y + 1, z + 1, tsdfResolution, tsdfSize);
 	cell.p[7] = Vector3d(tmp[0], tmp[1], tmp[2]);
 
 	// cell corner values

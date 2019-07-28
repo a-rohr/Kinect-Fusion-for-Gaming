@@ -261,6 +261,7 @@ int main() {
 			raytraceImage(tsdfData, currentCameraPose, normalized_Intrinsics,
 				sensor.getDepthImageWidth(), sensor.getDepthImageHeight(),
 				1.5, 1e-3, depthImage, normalMap);
+
 			prev_depthMap = depthImage.ptr<float>(0);
 			i++;
 		}
