@@ -14,43 +14,54 @@ bool searchRay(Eigen::Vector3d origin, Eigen::Vector3d ray, double& length,
 	double stepSize = tsdfData.voxelSize * stepSizeVoxel;
 	double previousLength = length;
 
+	while (pointValue > 0.98f)
+	{
+		previousPointValue = pointValue;
+		previousLength = length;
+		length += 0.014;
+		point = origin + ray * length;
+		if (!TsdfUtils::isInTsdfGrid(point, tsdfData.size)) { return false; }
+		pointValue = TsdfUtils::getInterpolatedTsdfValue(point, tsdfData);
+
+	}
+
 	while (true)
 	{
+		if ((previousPointValue > 0) && (pointValue <= 0))
+		{
+			float zerolength;
+			float zeroValue;
+			do //Iterpolation to find zero crossing
+			{
+				zerolength = previousLength - ((length - previousLength)*previousPointValue) / (pointValue - previousPointValue);
+				Eigen::Vector3d zero_point = origin + ray * zerolength;
+				zeroValue = TsdfUtils::getInterpolatedTsdfValue(zero_point, tsdfData);
+				if (zeroValue < 0)
+				{
+					length = zerolength;
+					pointValue = zeroValue;
+				}
+				else
+				{
+					previousLength = zerolength;
+					previousPointValue = zeroValue;
+				}
+
+			} while (std::abs(zeroValue) > (1e-3));
+			length = zerolength;
+			return true;
+		}
+
+		previousPointValue = pointValue;
 		previousLength = length;
 		length += stepSize;
 		point = origin + ray * length;
-
 		if (!TsdfUtils::isInTsdfGrid(point, tsdfData.size)) { return false; }
-
-		previousPointValue = pointValue;
 		pointValue = TsdfUtils::getInterpolatedTsdfValue(point, tsdfData);
 
-		if (previousPointValue > 0.0 && pointValue < 0.0) { break; }
 	}
+	//
 
-	while (true)
-	{
-		double middleLength = (previousLength + length) / 2;
-		float middleValue = TsdfUtils::getInterpolatedTsdfValue(origin + ray * middleLength, tsdfData);
-
-		if (middleValue > epsilon)
-		{
-			previousLength = middleLength;
-		}
-		else if (middleValue < -epsilon)
-		{
-			length = middleLength;
-		}
-		else
-		{
-			break;
-		}
-
-		if (std::abs(length - previousLength) < 1e-2)
-		{
-			break;
-		}
-	}
 
 	return true;
 }
@@ -98,11 +109,11 @@ void raytraceImage(TsdfUtils::TsdfData tsdfData, Eigen::Matrix4f cameraPose, Eig
 				float valueXForward = TsdfUtils::getInterpolatedTsdfValue(point + Eigen::Vector3d(voxelSize, 0, 0), tsdfData);
 				float valueXBackward = TsdfUtils::getInterpolatedTsdfValue(point + Eigen::Vector3d(-voxelSize, 0, 0), tsdfData);
 
-				
+
 				float valueYForward = TsdfUtils::getInterpolatedTsdfValue(point + Eigen::Vector3d(0, voxelSize, 0), tsdfData);
 				float valueYBackward = TsdfUtils::getInterpolatedTsdfValue(point + Eigen::Vector3d(0, -voxelSize, 0), tsdfData);
 
-				
+
 				float valueZForward = TsdfUtils::getInterpolatedTsdfValue(point + Eigen::Vector3d(0, 0, voxelSize), tsdfData);
 				float valueZBackward = TsdfUtils::getInterpolatedTsdfValue(point + Eigen::Vector3d(0, 0, -voxelSize), tsdfData);
 
@@ -127,5 +138,5 @@ void raytraceImage(TsdfUtils::TsdfData tsdfData, Eigen::Matrix4f cameraPose, Eig
 			}
 		}
 	}
-	
+
 }
