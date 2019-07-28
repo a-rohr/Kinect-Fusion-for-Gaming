@@ -3,16 +3,15 @@
 #include <Eigen/Core>
 
 #include "Raycasting.hpp"
-#include "VoxelGrid.hpp"
 
-bool searchRay(VoxelGrid& voxelGrid, Eigen::Vector3d origin, Eigen::Vector3d ray, double& length,
-	const double stepSizeVoxel, const double epsilon)
+bool searchRay(Eigen::Vector3d origin, Eigen::Vector3d ray, double& length,
+	const double stepSizeVoxel, const double epsilon, TsdfUtils::TsdfData tsdfData)
 {
 	Eigen::Vector3d point = origin + ray * length;
-	float pointValue = voxelGrid.getValueAtPoint(point);
+	float pointValue = TsdfUtils::getValueAtPoint(point, tsdfData);
 	float previousPointValue = pointValue;
 
-	double stepSize = voxelGrid.voxelSize * stepSizeVoxel;
+	double stepSize = tsdfData.voxelSize * stepSizeVoxel;
 	double previousLength = length;
 
 	while (true)
@@ -21,10 +20,10 @@ bool searchRay(VoxelGrid& voxelGrid, Eigen::Vector3d origin, Eigen::Vector3d ray
 		length += stepSize;
 		point = origin + ray * length;
 
-		if (!voxelGrid.withinGrid(point)) { return false; }
+		if (!TsdfUtils::tsdfWithinGrid(point, tsdfData.size)) { return false; }
 
 		previousPointValue = pointValue;
-		pointValue = voxelGrid.getValueAtPoint(point);
+		pointValue = TsdfUtils::getValueAtPoint(point, tsdfData);
 
 		if (previousPointValue > 0.0 && pointValue < 0.0) { break; }
 	}
@@ -32,7 +31,7 @@ bool searchRay(VoxelGrid& voxelGrid, Eigen::Vector3d origin, Eigen::Vector3d ray
 	while (true)
 	{
 		double middleLength = (previousLength + length) / 2;
-		float middleValue = voxelGrid.getValueAtPoint(origin + ray * middleLength);
+		float middleValue = TsdfUtils::getValueAtPoint(origin + ray * middleLength, tsdfData);
 
 		if (middleValue > epsilon)
 		{
@@ -57,7 +56,7 @@ bool searchRay(VoxelGrid& voxelGrid, Eigen::Vector3d origin, Eigen::Vector3d ray
 }
 
 
-void raytraceImage(VoxelGrid& voxelGrid, Pose cameraPose, Eigen::Matrix3d cameraIntrisic,
+void raytraceImage(TsdfUtils::TsdfData tsdfData, Eigen::Matrix4f cameraPose, Eigen::Matrix3d cameraIntrisic,
 	const unsigned int resolutionWidth, const unsigned int resolutionHeight,
 	const double stepSizeVoxel, const double epsilon,
 	cv::Mat& depthImage, cv::Mat& normalImage)
@@ -70,7 +69,9 @@ void raytraceImage(VoxelGrid& voxelGrid, Pose cameraPose, Eigen::Matrix3d camera
 	double cx = cameraIntrisic(0, 2)*resolutionWidth - 0.5;
 	double cy = cameraIntrisic(1, 2)*resolutionHeight - 0.5;
 
-	Eigen::Vector3d origin = cameraPose.translation;
+	Eigen::Matrix3d cam_R = cameraPose.cast<double>().block(0, 0, 3, 3).transpose();
+	Eigen::Vector3d cam_t = -cam_R * cameraPose.cast<double>().col(3).head(3);
+	Eigen::Vector3d origin = cam_t;
 
 #pragma omp parallel for
 	for (int v = 0; v < resolutionHeight; ++v)
@@ -81,39 +82,36 @@ void raytraceImage(VoxelGrid& voxelGrid, Pose cameraPose, Eigen::Matrix3d camera
 			double rayY = ((double)v - cy) / fy;
 			Eigen::Vector3d ray(rayX, rayY, 1);
 
-			ray = cameraPose.transformVector(ray);
+			ray = cam_R * ray;
 			cv::Vec3f normal;
 			double length;
 
-			if (voxelGrid.projectRayToVoxelPoint(origin, ray, length) && // Does the ray hit the voxel grid
-				searchRay(voxelGrid, origin, ray, length, stepSizeVoxel, epsilon)) // Does the ray hit a zero crossing
+			if (TsdfUtils::projectRayToVoxelPoint(origin, ray, length, tsdfData.size) && // Does the ray hit the voxel grid
+				searchRay(origin, ray, length, stepSizeVoxel, epsilon, tsdfData)) // Does the ray hit a zero crossing
 			{
 				depthImage.at<float>(v, u) = (float)length;
 
-				if (depthImage.at<float>(v, u) == 0.0f)
-					std::cout << "Invalid depth value at: (" << v << " , " << u << ") will exit now!\n";
-				assert(depthImage.at<float>(v, u) != 0.0f);
-
-
 				Eigen::Vector3d point = origin + ray * length;
 
-				const double voxelSize = voxelGrid.voxelSize;
+				const double voxelSize = voxelSize;
 
-				float valueXForward = voxelGrid.getValueAtPoint(point + Eigen::Vector3d(voxelSize, 0, 0));
-				float valueXBackward = voxelGrid.getValueAtPoint(point + Eigen::Vector3d(-voxelSize, 0, 0));
+				float valueXForward = TsdfUtils::getValueAtPoint(point + Eigen::Vector3d(voxelSize, 0, 0), tsdfData);
+				float valueXBackward = TsdfUtils::getValueAtPoint(point + Eigen::Vector3d(-voxelSize, 0, 0), tsdfData);
 
-				float valueYForward = voxelGrid.getValueAtPoint(point + Eigen::Vector3d(0, voxelSize, 0));
-				float valueYBackward = voxelGrid.getValueAtPoint(point + Eigen::Vector3d(0, -voxelSize, 0));
+				
+				float valueYForward = TsdfUtils::getValueAtPoint(point + Eigen::Vector3d(0, voxelSize, 0), tsdfData);
+				float valueYBackward = TsdfUtils::getValueAtPoint(point + Eigen::Vector3d(0, -voxelSize, 0), tsdfData);
 
-				float valueZForward = voxelGrid.getValueAtPoint(point + Eigen::Vector3d(0, 0, voxelSize));
-				float valueZBackward = voxelGrid.getValueAtPoint(point + Eigen::Vector3d(0, 0, -voxelSize));
+				
+				float valueZForward = TsdfUtils::getValueAtPoint(point + Eigen::Vector3d(0, 0, voxelSize), tsdfData);
+				float valueZBackward = TsdfUtils::getValueAtPoint(point + Eigen::Vector3d(0, 0, -voxelSize), tsdfData);
 
 				Eigen::Vector3d normalVec(
 					(valueXForward - valueXBackward) / 2,
 					(valueYForward - valueYBackward) / 2,
 					(valueZForward - valueZBackward) / 2
 				);
-				normalVec = cameraPose.orientation.transpose()*normalVec;
+				normalVec = cam_R.transpose() * normalVec;
 				normalVec.normalize();
 
 				normal(0) = (float)normalVec.x();
@@ -129,4 +127,5 @@ void raytraceImage(VoxelGrid& voxelGrid, Pose cameraPose, Eigen::Matrix3d camera
 			}
 		}
 	}
+	
 }

@@ -178,11 +178,7 @@
     <ClCompile Include="depth_camera.cpp" />
     <ClCompile Include="FreeImageHelper.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="Model.cpp" />
-    <ClCompile Include="Pose.cpp" />
     <ClCompile Include="Raycasting.cpp" />
-    <ClCompile Include="Vertex.cpp" />
-    <ClCompile Include="VoxelGrid.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="data_types.h" />
@@ -190,19 +186,15 @@
     <ClInclude Include="Eigen.h" />
     <ClInclude Include="FreeImageHelper.h" />
     <ClInclude Include="ICPOptimizer.h" />
-    <ClInclude Include="ImplicitSurface.hpp" />
     <ClInclude Include="KinectOptimizer.h" />
     <ClInclude Include="MarchingCubes.h" />
-    <ClInclude Include="Model.hpp" />
     <ClInclude Include="NearestNeighbor.h" />
     <ClInclude Include="PointCloud.h" />
-    <ClInclude Include="Pose.hpp" />
     <ClInclude Include="ProcrustesAligner.h" />
     <ClInclude Include="Raycasting.hpp" />
     <ClInclude Include="SimpleMesh.h" />
-    <ClInclude Include="Vertex.hpp" />
+    <ClInclude Include="TsdfUtils.h" />
     <ClInclude Include="VirtualSensor.h" />
-    <ClInclude Include="VoxelGrid.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

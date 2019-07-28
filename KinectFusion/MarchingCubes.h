@@ -4,7 +4,7 @@
 #define MARCHING_CUBES_H
 
 #include "SimpleMesh.h"
-#include "VoxelGrid.hpp"
+#include "TsdfUtils.h"
 
 struct MC_Triangle {
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -416,39 +416,42 @@ int Polygonise(MC_Gridcell grid, double isolevel, MC_Triangle* triangles) {
 }
 
 
-bool ProcessVolumeCell(VoxelGrid* vol, int x, int y, int z, double iso, SimpleMesh* mesh)
+bool ProcessVolumeCell(TsdfUtils::TsdfData tsdfData, int x, int y, int z, double iso, SimpleMesh* mesh)
 {
 	MC_Gridcell cell;
 
 	Vector3d tmp;
 
+	unsigned int tsdfResolution = tsdfData.resolution;
+	double tsdfSize = tsdfData.size;
+
 	// cell corners
-	tmp = vol->pos(x + 1, y, z);
+	tmp = TsdfUtils::pos(x + 1, y, z, tsdfResolution, tsdfSize);
 	cell.p[0] = Vector3d(tmp[0], tmp[1], tmp[2]);
-	tmp = vol->pos(x, y, z);
+	tmp = TsdfUtils::pos(x, y, z, tsdfResolution, tsdfSize);
 	cell.p[1] = Vector3d(tmp[0], tmp[1], tmp[2]);
-	tmp = vol->pos(x, y + 1, z);
+	tmp = TsdfUtils::pos(x, y + 1, z, tsdfResolution, tsdfSize);
 	cell.p[2] = Vector3d(tmp[0], tmp[1], tmp[2]);
-	tmp = vol->pos(x + 1, y + 1, z);
+	tmp = TsdfUtils::pos(x + 1, y + 1, z, tsdfResolution, tsdfSize);
 	cell.p[3] = Vector3d(tmp[0], tmp[1], tmp[2]);
-	tmp = vol->pos(x + 1, y, z + 1);
+	tmp = TsdfUtils::pos(x + 1, y, z + 1, tsdfResolution, tsdfSize);
 	cell.p[4] = Vector3d(tmp[0], tmp[1], tmp[2]);
-	tmp = vol->pos(x, y, z + 1);
+	tmp = TsdfUtils::pos(x, y, z + 1, tsdfResolution, tsdfSize);
 	cell.p[5] = Vector3d(tmp[0], tmp[1], tmp[2]);
-	tmp = vol->pos(x, y + 1, z + 1);
+	tmp = TsdfUtils::pos(x, y + 1, z + 1, tsdfResolution, tsdfSize);
 	cell.p[6] = Vector3d(tmp[0], tmp[1], tmp[2]);
-	tmp = vol->pos(x + 1, y + 1, z + 1);
+	tmp = TsdfUtils::pos(x + 1, y + 1, z + 1, tsdfResolution, tsdfSize);
 	cell.p[7] = Vector3d(tmp[0], tmp[1], tmp[2]);
 
 	// cell corner values
-	cell.val[0] = (double)vol->getValue(x + 1, y, z);
-	cell.val[1] = (double)vol->getValue(x, y, z);
-	cell.val[2] = (double)vol->getValue(x, y + 1, z);
-	cell.val[3] = (double)vol->getValue(x + 1, y + 1, z);
-	cell.val[4] = (double)vol->getValue(x + 1, y, z + 1);
-	cell.val[5] = (double)vol->getValue(x, y, z + 1);
-	cell.val[6] = (double)vol->getValue(x, y + 1, z + 1);
-	cell.val[7] = (double)vol->getValue(x + 1, y + 1, z + 1);
+	cell.val[0] = (double)TsdfUtils::getTsdfValue(x + 1, y, z, tsdfData);
+	cell.val[1] = (double)TsdfUtils::getTsdfValue(x, y, z, tsdfData);
+	cell.val[2] = (double)TsdfUtils::getTsdfValue(x, y + 1, z, tsdfData);
+	cell.val[3] = (double)TsdfUtils::getTsdfValue(x + 1, y + 1, z, tsdfData);
+	cell.val[4] = (double)TsdfUtils::getTsdfValue(x + 1, y, z + 1, tsdfData);
+	cell.val[5] = (double)TsdfUtils::getTsdfValue(x, y, z + 1, tsdfData);
+	cell.val[6] = (double)TsdfUtils::getTsdfValue(x, y + 1, z + 1, tsdfData);
+	cell.val[7] = (double)TsdfUtils::getTsdfValue(x + 1, y + 1, z + 1, tsdfData);
 
 	MC_Triangle tris[6];
 	int numTris = Polygonise(cell, iso, tris);

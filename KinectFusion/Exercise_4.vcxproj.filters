@@ -24,19 +24,7 @@
     <ClCompile Include="FreeImageHelper.cpp">
       <Filter>Utils</Filter>
     </ClCompile>
-    <ClCompile Include="Pose.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Vertex.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="VoxelGrid.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="depth_camera.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Model.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Raycasting.cpp">
@@ -68,19 +56,7 @@
     <ClInclude Include="PointCloud.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="ImplicitSurface.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="KinectOptimizer.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Pose.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Vertex.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="VoxelGrid.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="MarchingCubes.h">
@@ -92,10 +68,10 @@
     <ClInclude Include="depth_camera.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Model.hpp">
+    <ClInclude Include="Raycasting.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Raycasting.hpp">
+    <ClInclude Include="TsdfUtils.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

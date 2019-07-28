@@ -268,7 +268,7 @@ public:
 		for (unsigned int i = 0; i < m_vertices.size(); i++) {
 			const auto& vertex = m_vertices[i];
 			if (vertex.position.allFinite())
-				outFile << "v " << -vertex.position.x() << " " << -vertex.position.y() << " " << -vertex.position.z() << std::endl;
+				outFile << "v " << vertex.position.x() << " " << vertex.position.y() << " " << vertex.position.z() << std::endl;
 			else
 				outFile << "v 0.0 0.0 0.0" << std::endl;
 		}

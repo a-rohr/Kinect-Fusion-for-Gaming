@@ -18,9 +18,7 @@
 #include <opencv2/opencv.hpp>
 #include <opencv2/core/utils/filesystem.hpp>
 
-#include "Model.hpp"
 #include "Raycasting.hpp"
-#include "Pose.hpp"
 
 #include "KinectOptimizer.h"
 #include "VirtualSensor.h"
@@ -28,23 +26,24 @@
 #include "PointCloud.h"
 #include "MarchingCubes.h"
 #include "DepthCamera.h"
+#include "TsdfUtils.h"
 
 #define PROJECT 1
 
 
-void saveVolume(VoxelGrid* vol, std::string filenameOut, Matrix4f currentCameraPose)
+void saveVolume(TsdfUtils::TsdfData tsdfData, std::string filenameOut, Matrix4f currentCameraPose)
 {
 	clock_t begin = clock();
 	SimpleMesh mesh;
 
 #pragma omp parallel for
-	for (int x = 0; x < vol->resolution - 1; x++)
+	for (int x = 0; x < tsdfData.resolution - 1; x++)
 	{
-		for (unsigned int y = 0; y < vol->resolution - 1; y++)
+		for (unsigned int y = 0; y < tsdfData.resolution - 1; y++)
 		{
-			for (unsigned int z = 0; z < vol->resolution - 1; z++)
+			for (unsigned int z = 0; z < tsdfData.resolution - 1; z++)
 			{
-				ProcessVolumeCell(vol, (unsigned int)x, y, z, 0.00f, &mesh);
+				ProcessVolumeCell(tsdfData, (unsigned int)x, y, z, 0.00f, &mesh);
 			}
 		}
 	}
@@ -202,14 +201,24 @@ int main() {
 	int depthCols = sensor.getDepthImageWidth();
 	int depthRows = sensor.getDepthImageHeight();
 	Eigen::Vector2i camResolution(depthCols, depthRows);
-	ModelReconstructor model(truncationDistance, resolution, size, cameraIntrinsic, camResolution);
+	
+	// TSDF Setup
+	TsdfUtils::TsdfData tsdfData;
+	tsdfData.numVoxels = resolution * resolution * resolution;
+	tsdfData.resolution = resolution;
+	tsdfData.size = size;
+	tsdfData.voxelSize = size / resolution;
+	tsdfData.tsdf = new float[tsdfData.numVoxels];
+	tsdfData.weights = new float[tsdfData.numVoxels];
+	tsdfData.truncationDistance = truncationDistance;
+	std::fill_n(tsdfData.tsdf, tsdfData.numVoxels, 1.0f);
+	std::fill_n(tsdfData.weights, tsdfData.numVoxels, 0.0f);
 
 	if (KinectDataset) {
 		sensor.processNextFrame();
 		KinectFusionOptimizer optimizer;
 		optimizer.setNbOfIterationsInPyramid(iterNumbers);
 		optimizer.setMatchingMaxDistance(0.15);
-		//optimizer.setMatchingMaxDistance(0.05);
 		unsigned int depthFrameSize = sensor.getDepthImageWidth()* sensor.getDepthImageHeight();
 		float* prev_depthMap;
 		cv::Mat depthImage = cv::Mat::zeros(sensor.getDepthImageHeight(), sensor.getDepthImageWidth(), CV_32F);
@@ -225,13 +234,13 @@ int main() {
 		float* depthMapArr = sensor.getDepth();
 		Eigen::MatrixXd depthMap = Eigen::Map< Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> >(depthMapArr, depthRows, depthCols).cast<double>();
 
-		model.fuseFrame(depthMap, currentCameraPose.cast<double>());
-		Pose curCamPose = Pose(currentCameraPose.cast<double>());
-		VoxelGrid grid = *model.getModel();
+		TsdfUtils::fuseTsdf(tsdfData, cameraIntrinsic, camResolution,
+			depthMap, currentCameraPose.cast<double>());
+
 		Eigen::Matrix3d normalized_Intrinsics = sensor.getDepthIntrinsics().cast<double>();
 		normalized_Intrinsics.row(0) = normalized_Intrinsics.row(0) / sensor.getDepthImageWidth();
 		normalized_Intrinsics.row(1) = normalized_Intrinsics.row(1) / sensor.getDepthImageHeight();
-		raytraceImage(grid, curCamPose, normalized_Intrinsics, sensor.getDepthImageWidth(), sensor.getDepthImageHeight(), 1.5, 1e-3, depthImage, normalMap);
+		raytraceImage(tsdfData, currentCameraPose, normalized_Intrinsics, sensor.getDepthImageWidth(), sensor.getDepthImageHeight(), 1.5, 1e-3, depthImage, normalMap);
 		prev_depthMap = depthImage.ptr<float>(0);
 		while (sensor.processNextFrame()) {
 			Matrix4f currentCameraPose;
@@ -241,15 +250,15 @@ int main() {
 			std::cout << "Current calculated camera pose: " << std::endl << currentCameraPose << std::endl;
 
 			Eigen::MatrixXd depthMap = Eigen::Map< Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> >(sensor.getDepth(), depthRows, depthCols).cast<double>();
-			model.fuseFrame(depthMap, currentCameraPose.cast<double>());
+			TsdfUtils::fuseTsdf(tsdfData, cameraIntrinsic, camResolution,
+				depthMap, currentCameraPose.cast<double>());
 
 			if (i % ITER_Print == 0) {
 				std::stringstream ss;
 				ss << filenameBaseOut << sensor.getCurrentFrameCnt() << ".obj";
-				saveVolume(model.getModel(), ss.str(), currentCameraPose);
+				saveVolume(tsdfData, ss.str(), currentCameraPose);
 			}
-			Pose curCamPose = Pose(currentCameraPose.cast<double>());
-			raytraceImage(*model.getModel(), curCamPose, normalized_Intrinsics,
+			raytraceImage(tsdfData, currentCameraPose, normalized_Intrinsics,
 				sensor.getDepthImageWidth(), sensor.getDepthImageHeight(),
 				1.5, 1e-3, depthImage, normalMap);
 			prev_depthMap = depthImage.ptr<float>(0);
@@ -274,13 +283,13 @@ int main() {
 		Matrix4f currentCameraToWorld = currentCameraPose.inverse();
 		float* depthMapArr = sensor.getDepth();
 		Eigen::MatrixXd depthMap = Eigen::Map< Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> >(depthMapArr, depthRows, depthCols).cast<double>();
-		model.fuseFrame(depthMap, currentCameraPose.cast<double>());
-		Pose curCamPose = Pose(currentCameraPose.cast<double>());
-		VoxelGrid grid = *model.getModel();
+		TsdfUtils::fuseTsdf(tsdfData, cameraIntrinsic, camResolution,
+			depthMap, currentCameraPose.cast<double>());
+		
 		Eigen::Matrix3d normalized_Intrinsics = sensor.getDepthIntrinsics().cast<double>();
 		normalized_Intrinsics.row(0) = normalized_Intrinsics.row(0) / sensor.getDepthImageWidth();
 		normalized_Intrinsics.row(1) = normalized_Intrinsics.row(1) / sensor.getDepthImageHeight();
-		raytraceImage(grid, curCamPose, normalized_Intrinsics, sensor.getDepthImageWidth(), sensor.getDepthImageHeight(), 1.5, 1e-3, depthImage, normalMap);
+		raytraceImage(tsdfData, currentCameraPose, normalized_Intrinsics, sensor.getDepthImageWidth(), sensor.getDepthImageHeight(), 1.5, 1e-3, depthImage, normalMap);
 		prev_depthMap = depthImage.ptr<float>(0);
 		while (sensor.processNextFrameNoTxt(filenameIn)) {
 			Matrix4f currentCameraPose;
@@ -290,16 +299,16 @@ int main() {
 			std::cout << "Current calculated camera pose: " << std::endl << currentCameraPose << std::endl;
 
 			Eigen::MatrixXd depthMap = Eigen::Map< Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> >(sensor.getDepth(), depthRows, depthCols).cast<double>();
-			model.fuseFrame(depthMap, currentCameraPose.cast<double>());
+			TsdfUtils::fuseTsdf(tsdfData, cameraIntrinsic, camResolution,
+				depthMap, currentCameraPose.cast<double>());
 
 			if (i % ITER_Print == 0) {
 				std::stringstream ss;
 				ss << filenameBaseOut << sensor.getCurrentFrameCnt() << ".obj";
-				saveVolume(model.getModel(), ss.str(), currentCameraPose);
+				saveVolume(tsdfData, ss.str(), currentCameraPose);
 			}
 
-			Pose curCamPose = Pose(currentCameraPose.cast<double>());
-			raytraceImage(*model.getModel(), curCamPose, normalized_Intrinsics,
+			raytraceImage(tsdfData, currentCameraPose, normalized_Intrinsics,
 				sensor.getDepthImageWidth(), sensor.getDepthImageHeight(),
 				1.5, 1e-3, depthImage, normalMap);
 			prev_depthMap = depthImage.ptr<float>(0);
@@ -342,13 +351,14 @@ int main() {
 		Matrix4d currentCameraPose = currentCameraToWorld.inverse().cast<double>();
 		float* depthMapArr = sensor.getDepth();
 		Eigen::MatrixXd depthMap = Eigen::Map< Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> >(depthMapArr, depthRows, depthCols).cast<double>();
-		model.fuseFrame(depthMap, currentCameraPose);
-		Pose curCamPose = Pose(currentCameraPose);
-		VoxelGrid grid = *model.getModel();
+		
+		TsdfUtils::fuseTsdf(tsdfData, cameraIntrinsic, camResolution,
+			depthMap, currentCameraPose.cast<double>());
+
 		Eigen::Matrix3d normalized_Intrinsics = sensor.getDepthIntrinsics().cast<double>();
 		normalized_Intrinsics.row(0) = normalized_Intrinsics.row(0) / sensor.getDepthImageWidth();
 		normalized_Intrinsics.row(1) = normalized_Intrinsics.row(1) / sensor.getDepthImageHeight();
-		raytraceImage(grid, curCamPose, normalized_Intrinsics, sensor.getDepthImageWidth(), sensor.getDepthImageHeight(), 1.5, 1e-3, depthImage, normalMap);
+		raytraceImage(tsdfData, currentCameraPose.cast<float>(), normalized_Intrinsics, sensor.getDepthImageWidth(), sensor.getDepthImageHeight(), 1.5, 1e-3, depthImage, normalMap);
 		prev_depthMap = depthImage.ptr<float>(0);
 
 		printf("=========Done Iteration #%i, press 'c' to continue. Press 'q' to finish.\n", current_index);
@@ -387,14 +397,14 @@ int main() {
 				Matrix4f currentCameraPose = currentCameraToWorld.inverse();
 				std::cout << "Current calculated camera pose: " << std::endl << currentCameraPose << std::endl;
 				Eigen::MatrixXd depthMap = Eigen::Map< Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> >(sensor.getDepth(), depthRows, depthCols).cast<double>();
-				model.fuseFrame(depthMap, currentCameraPose.cast<double>());
+				
+				TsdfUtils::fuseTsdf(tsdfData, cameraIntrinsic, camResolution, depthMap, currentCameraPose.cast<double>());
 				if (i % ITER_Print == 0) {
 					std::stringstream ss;
 					ss << filenameBaseOut << sensor.getCurrentFrameCnt() << ".obj";
-					saveVolume(model.getModel(), ss.str(), currentCameraPose);
+					saveVolume(tsdfData, ss.str(), currentCameraPose);
 				}
-				Pose curCamPose = Pose(currentCameraPose.cast<double>());
-				raytraceImage(*model.getModel(), curCamPose, normalized_Intrinsics,
+				raytraceImage(tsdfData, currentCameraPose, normalized_Intrinsics,
 					sensor.getDepthImageWidth(), sensor.getDepthImageHeight(),
 					1.5, 1e-3, depthImage, normalMap);
 
