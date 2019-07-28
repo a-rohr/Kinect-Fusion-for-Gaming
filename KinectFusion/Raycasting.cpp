@@ -4,7 +4,7 @@
 
 #include "Raycasting.hpp"
 
-bool searchRay(Eigen::Vector3d origin, Eigen::Vector3d ray, double& length,
+bool search_zero_crossing(Eigen::Vector3d origin, Eigen::Vector3d ray, double& length,
 	const double stepSizeVoxel, const double epsilon, TsdfUtils::TsdfData tsdfData)
 {
 	Eigen::Vector3d point = origin + ray * length;
@@ -67,7 +67,7 @@ bool searchRay(Eigen::Vector3d origin, Eigen::Vector3d ray, double& length,
 }
 
 
-void raytraceImage(TsdfUtils::TsdfData tsdfData, Eigen::Matrix4f cameraPose, Eigen::Matrix3d cameraIntrisic,
+void castRays(TsdfUtils::TsdfData tsdfData, Eigen::Matrix4f cameraPose, Eigen::Matrix3d cameraIntrisic,
 	const unsigned int resolutionWidth, const unsigned int resolutionHeight,
 	const double stepSizeVoxel, const double epsilon,
 	cv::Mat& depthImage, cv::Mat& normalImage)
@@ -98,7 +98,7 @@ void raytraceImage(TsdfUtils::TsdfData tsdfData, Eigen::Matrix4f cameraPose, Eig
 			double length;
 
 			if (TsdfUtils::projectToTsdf(origin, ray, length, tsdfData.size) && // Does the ray hit the voxel grid
-				searchRay(origin, ray, length, stepSizeVoxel, epsilon, tsdfData)) // Does the ray hit a zero crossing
+				search_zero_crossing(origin, ray, length, stepSizeVoxel, epsilon, tsdfData)) // Does the ray hit a zero crossing
 			{
 				depthImage.at<float>(v, u) = (float)length;
 
