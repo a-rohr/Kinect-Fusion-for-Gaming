@@ -6,7 +6,7 @@ This is a group project for the course 3D Scanning and Motion Capture offered at
 # Project Goals
 The key goals for this project are to:
 1. Implement the KinectFusion algorithm outlined by Izadi in 2011.
-2. Integrate 3D-reconstructed scenes into Unity.
+2. Integrate 3D-reconstructed scenes into Unity3D.
 3. Create a simple car rig that can drive around the reconstructed scene and award users for safe driving. 
 
 # Project Pipeline
